@@ -1,7 +1,6 @@
 import grequests
 import pandas as pd
-import numpy as np
-
+import sqlite3
 
 class WNBAScraper():
     def __init__(self, start_date, end_date):
@@ -91,7 +90,9 @@ class WNBAScraper():
 
 
         self.game_data = pd.DataFrame(rows)
-        self.game_ids = pd.unique(self.game_data['game_id'])
+
+
+        self.game_ids = pd.unique(self.game_data[self.game_data['completed']]['game_id'])
 
 
         
@@ -134,6 +135,9 @@ class WNBAScraper():
                             params = game_params) for game_params in params_list)
 
         self.game_data_responses = grequests.map(reqs)
+
+    def game_meta_data(self):
+        return self.game_data
 
     def player_box_scores(self):
         responses = self.game_data_responses
@@ -205,10 +209,10 @@ class WNBAScraper():
 
 
                     player_box_score_rows.append({
-                        'game_id': int(game_id),
+                        'game_id': game_id,
                         'player': athlete['displayName'],
                         'player_team': team,
-                        'player_id': int(athlete['id']),
+                        'player_id': athlete['id'],
                         'player_guid': athlete['guid'],
                         'player_position': athlete['position']['displayName'],
                         'player_active': bool(metadata['active']),
@@ -238,6 +242,37 @@ class WNBAScraper():
 
 
         player_box_scores_df = pd.DataFrame(player_box_score_rows)
+        
+
+        ## correct dtypes
+        int_cols = ['game_id',
+                    'player_id', 
+                    'minutes', 
+                    'points', 
+                    'field_goals_made', 
+                    'field_goals_attempted', 
+                     'threes_made', 
+                     'threes_attempted', 
+                     'free_throws_made', 
+                     'free_throws_attempted', 
+                     'rebounds', 
+                     'assists', 
+                     'turnovers', 
+                     'steals', 
+                     'blocks', 
+                     'offensive_rebounds', 
+                     'defensive_rebounds', 
+                     'fouls', 
+                     'plus_minus']
+        
+        player_box_scores_df[int_cols] = player_box_scores_df[int_cols].apply(pd.to_numeric, errors = 'coerce').astype('Int64')
+
+
+        ## pk
+        player_box_scores_df['player_game_id'] = player_box_scores_df['game_id'].astype(str) + '-' + player_box_scores_df['player']
+        player_box_scores_df = player_box_scores_df.set_index('player_game_id')
+
+
         return player_box_scores_df
 
     def team_box_scores(self):
@@ -273,22 +308,22 @@ class WNBAScraper():
 
 
                 team_box_score_rows.append({
-                    'game_id': game_data['id'], 
-                    'team_name': team_name, 
-                    'team_id': team_id, 
-                    'fg_made': fg_made, 
-                    'fg_attempted': fg_attempted, 
+                    'game_id': game_data['id'],
+                    'team_name': team_name,
+                    'team_id': team_id,
+                    'fg_made': fg_made,
+                    'fg_attempted': fg_attempted,
                     'fg_pct': stats[1]['displayValue'],
-                    'threes_made': threes_made, 
-                    'threes_attempted': threes_attempted, 
+                    'threes_made': threes_made,
+                    'threes_attempted': threes_attempted,
                     'threes_pct': stats[3]['displayValue'],
-                    'free_throws_made': free_throws_made, 
-                    'free_throws_attempted': free_throws_attempted, 
-                    'free_throws_pct': stats[5]['displayValue'], 
-                    'total_rebounds': stats[6]['displayValue'], 
-                    'offensive_rebounds': stats[7]['displayValue'], 
-                    'defensive_rebounds': stats[8]['displayValue'], 
-                    'assists': stats[9]['displayValue'], 
+                    'free_throws_made': free_throws_made,
+                    'free_throws_attempted': free_throws_attempted,
+                    'free_throws_pct': stats[5]['displayValue'],
+                    'total_rebounds': stats[6]['displayValue'],
+                    'offensive_rebounds': stats[7]['displayValue'],
+                    'defensive_rebounds': stats[8]['displayValue'],
+                    'assists': stats[9]['displayValue'],
                     'steals': stats[10]['displayValue'],
                     'blocks': stats[11]['displayValue'],
                     'turnovers': stats[12]['displayValue'],
@@ -301,11 +336,52 @@ class WNBAScraper():
                     'fastbreak_points': stats[19]['displayValue'],
                     'points_in_paint': stats[20]['displayValue'],
                     'fouls': stats[21]['displayValue'],
-                    'largest_lead': stats[22]['displayValue'], 
+                    'largest_lead': stats[22]['displayValue'],
                     'home_away': home_away
                 })
 
+
         team_box_scores_df = pd.DataFrame(team_box_score_rows)
+
+        int_cols = ['game_id', 
+                    'team_id', 
+                    'fg_made', 
+                    'fg_attempted',
+                    'threes_made', 
+                    'threes_attempted',
+                    'free_throws_made', 
+                    'free_throws_attempted',
+                    'total_rebounds', 
+                    'offensive_rebounds', 
+                    'defensive_rebounds',
+                    'assists', 
+                    'steals', 
+                    'blocks', 
+                    'turnovers', 
+                    'team_turnovers',
+                    'total_turnovers', 
+                    'technical_fouls', 
+                    'total_technical_fouls',
+                    'flagrant_fouls',
+                    'turnover_points', 
+                    'fastbreak_points',
+                    'points_in_paint', 
+                    'fouls', 'largest_lead']
+
+        team_box_scores_df[int_cols] = team_box_scores_df[int_cols].apply(pd.to_numeric, errors = 'coerce').astype('Int64')
+
+        float_cols = [
+            'free_throws_pct', 
+            'threes_pct', 
+            'fg_pct'
+        ]
+        team_box_scores_df[float_cols] = team_box_scores_df[float_cols].apply(pd.to_numeric, errors = 'coerce').astype('Float64')
+
+
+        ## pk
+        team_box_scores_df['team_game_id'] = team_box_scores_df['game_id'].astype(str)  + '-' + team_box_scores_df['team_name']
+        team_box_scores_df = team_box_scores_df.set_index('team_game_id')
+
         return team_box_scores_df
 
     def pbp(self):
@@ -351,7 +427,7 @@ class WNBAScraper():
                     'game_id': game_id,
                     'play_number': play_number, 
                     'play_id': play_id,  
-                    'team': play['team']['$key'],
+                    'team_id': play['team']['$key'],
                     'scorer': scorer, 
                     'assister': assister,
                     'text': play['text'], 
@@ -366,7 +442,7 @@ class WNBAScraper():
                     'points_attempted': play['pointsAttempted'], 
                     'shooting_play': play['shootingPlay'],
                     'period': play['period']['number'], 
-                    'seconds_remaining_quarter': int(play['clock']['value']),
+                    'seconds_remaining_quarter': play['clock']['value'],
                     'clock_display': play['clock']['displayValue'], 
                     'coord_x': play['coordinate']['x'], 
                     'coord_y': play['coordinate']['y'], 
@@ -376,11 +452,43 @@ class WNBAScraper():
 
         pbp_df = pd.DataFrame(rows)
 
-        int_cols = ['game_id', 'play_number', 'play_id', 'team', 
-                    'scorer', 'assister', 'type_id', 'subtype_id', 
-                    'home_score', 'away_score', 'score_value', 'points_attempted', 
-                    'period', 'seconds_remaining_quarter', 'coord_x', 'coord_y']
-        pbp_df[int_cols] = pbp_df[int_cols].apply(pd.to_numeric, errors='coerce').astype('Int64')
+        int_cols = ['game_id', 
+                    'play_number', 
+                    'play_id', 
+                    'team_id', 
+                    'scorer', 
+                    'assister', 
+                    'type_id', 
+                    'subtype_id', 
+                    'home_score', 
+                    'away_score', 
+                    'score_value', 
+                    'points_attempted', 
+                    'period', 
+                    'coord_x', 
+                    'coord_y']
+        
+        float_cols = ['seconds_remaining_quarter']
+
+        pbp_df[int_cols] = pbp_df[int_cols].apply(pd.to_numeric, errors = 'coerce').astype('Int64')
+        pbp_df[float_cols] = pbp_df[float_cols].apply(pd.to_numeric, errors = 'coerce').astype('Float64')
 
 
+        ## set pk
+        pbp_df = pbp_df.set_index('play_id')
         return pbp_df
+
+    def db_writer(self, db_path, unique_keys, tables):
+        conn = sqlite3.connect(db_path)
+        for table_name, df in tables.items():
+            df.to_sql(name = table_name, con = conn, if_exists = 'append')
+            conn.execute(f'''
+                        delete from {table_name}
+                        where rowid not in (
+                            select min(rowid)
+                            from {table_name}
+                            group by {unique_keys[table_name]}
+                            )
+                        ''')
+        conn.commit()
+        conn.close()
