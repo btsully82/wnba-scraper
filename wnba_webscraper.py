@@ -5,7 +5,6 @@ from sqlalchemy import create_engine, text
 
 class WNBAScraper():
     def __init__(self, start_date = None, end_date = None):
-
         if not start_date and end_date:
             raise ValueError('If supplying an end date, must also supply a start date.')
         
@@ -27,7 +26,6 @@ class WNBAScraper():
         base_headers = {
             'accept': 'application/json, text/plain, */*',
             'accept-language': 'en-US,en;q=0.9',
-            'if-modified-since': 'Wed, 29 Apr 2026 01:13:20 GMT',
             'priority': 'u=1, i',
             'sec-ch-ua': '"Google Chrome";v="147", "Not.A/Brand";v="8", "Chromium";v="147"',
             'sec-ch-ua-mobile': '?0',
