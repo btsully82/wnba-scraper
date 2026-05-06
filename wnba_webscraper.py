@@ -9,11 +9,14 @@ class WNBAScraper():
             raise ValueError('If supplying an end date, must also supply a start date.')
         
         if not start_date and not end_date:
-            raise ValueError('Must supply a start date, or a start date and end date.')
+            ## no start date and no end date defaults to today only
+            self.start_date = datetime.date.today().strtime('%Y%m%d')
+            self.end_date = datetime.date.today().strtime('%Y%m%d')
         
         if start_date and not end_date:
+            ## if start date only, will get games from that day only
             self.start_date = str(start_date)
-            self.end_date = datetime.date.today().strftime('%Y%m%d')
+            self.end_date = str(start_date)
         
         
         if start_date and end_date:
@@ -151,7 +154,8 @@ class WNBAScraper():
         self.game_data_responses = grequests.map(reqs)
 
     def game_meta_data(self):
-        return self.game_data
+        game_data = self.game_data.sort_values(by = 'game_date').set_index('game_id')
+        return game_data
 
     def player_box_scores(self):
         responses = self.game_data_responses
