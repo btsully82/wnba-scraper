@@ -1,6 +1,6 @@
 import grequests
 import pandas as pd
-import sqlite3
+from sqlalchemy import create_engine, text
 
 class WNBAScraper():
     def __init__(self, start_date, end_date):
@@ -45,7 +45,7 @@ class WNBAScraper():
         rows = []
         last_date = None
         for response in responses:
-            if response.status_code != 200:
+            if (response is None) or (response.status_code != 200):
                 continue
 
 
@@ -145,7 +145,7 @@ class WNBAScraper():
         
         
         for response in responses:
-            if (response.status_code != 200) or (response is None):
+            if (response is None) or (response.status_code != 200):
                 continue
 
         for i in range(len(responses)):
@@ -280,7 +280,7 @@ class WNBAScraper():
         team_box_score_rows = []
         
         for response in responses:
-            if (response.status_code != 200) or (response is None):
+            if (response is None) or (response.status_code != 200):
                 continue
 
         for i in range(len(responses)):
@@ -305,6 +305,11 @@ class WNBAScraper():
                 fg_made, fg_attempted = stats[0]['displayValue'].split('-')
                 threes_made, threes_attempted = stats[2]['displayValue'].split('-')
                 free_throws_made, free_throws_attempted = stats[4]['displayValue'].split('-')
+
+                try:
+                    largest_lead = stats[22]['displayValue']
+                except:
+                    largest_lead = pd.NA
 
 
                 team_box_score_rows.append({
@@ -336,7 +341,7 @@ class WNBAScraper():
                     'fastbreak_points': stats[19]['displayValue'],
                     'points_in_paint': stats[20]['displayValue'],
                     'fouls': stats[21]['displayValue'],
-                    'largest_lead': stats[22]['displayValue'],
+                    'largest_lead': largest_lead,
                     'home_away': home_away
                 })
 
@@ -366,7 +371,8 @@ class WNBAScraper():
                     'turnover_points', 
                     'fastbreak_points',
                     'points_in_paint', 
-                    'fouls', 'largest_lead']
+                    'fouls', 
+                    'largest_lead']
 
         team_box_scores_df[int_cols] = team_box_scores_df[int_cols].apply(pd.to_numeric, errors = 'coerce').astype('Int64')
 
@@ -423,6 +429,11 @@ class WNBAScraper():
                         elif role == 'assister':
                             assister = key
 
+                try:
+                    wallclock = pd.to_datetime(play['wallclock'])
+                except:
+                    wallclock = pd.NA
+
                 rows.append({
                     'game_id': game_id,
                     'play_number': play_number, 
@@ -446,7 +457,7 @@ class WNBAScraper():
                     'clock_display': play['clock']['displayValue'], 
                     'coord_x': play['coordinate']['x'], 
                     'coord_y': play['coordinate']['y'], 
-                    'wallclock': pd.to_datetime(play['wallclock'])
+                    'wallclock': wallclock
                 })
 
 
@@ -479,16 +490,19 @@ class WNBAScraper():
         return pbp_df
 
     def db_writer(self, db_path, unique_keys, tables):
-        conn = sqlite3.connect(db_path)
+        engine = create_engine(db_path)
+
         for table_name, df in tables.items():
-            df.to_sql(name = table_name, con = conn, if_exists = 'append')
-            conn.execute(f'''
-                        delete from {table_name}
-                        where rowid not in (
-                            select min(rowid)
-                            from {table_name}
-                            group by {unique_keys[table_name]}
-                            )
-                        ''')
-        conn.commit()
-        conn.close()
+            df.to_sql(name = table_name, con = engine, if_exists = 'append')
+
+            with engine.begin() as conn:
+                conn.execute(text(f'''
+                    delete from {table_name}
+                    where rowid not in (
+                        select min(rowid)
+                        from {table_name}
+                        group by {unique_keys[table_name]}
+                    )
+                '''))
+
+        engine.dispose()
