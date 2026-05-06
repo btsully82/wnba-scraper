@@ -1,6 +1,7 @@
 import grequests
 import pandas as pd
 import datetime
+import sqlalchemy
 from sqlalchemy import create_engine, text
 
 class WNBAScraper():
@@ -511,7 +512,7 @@ class WNBAScraper():
         engine = create_engine(db_path)
 
         for table_name, df in tables.items():
-            df.to_sql(name = table_name, con = engine, if_exists = 'append')
+            df.to_sql(name = table_name, con = engine, if_exists = 'append', dtype = {'wallclock': sqlalchemy.types.DateTime()})
 
             with engine.begin() as conn:
                 conn.execute(text(f'''
