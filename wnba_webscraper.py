@@ -436,17 +436,13 @@ class WNBAScraper():
                     subtype = pbp[play_id]['type']['category']['slug']
                     subtype_id = pbp[play_id]['type']['category']['id']
 
-                scorer, assister = pd.NA, pd.NA
-                if play.get('participants'):
-                    for participant in play['participants']:
-                        role = participant['type']
-                        key = participant['athlete']['$key']
+                participants = play.get('participants', [])
 
-                        if role == 'scorer':
-                            scorer = key
+                keys = [p['athlete']['$key'] for p in participants]
+                roles = [p['type'] for p in participants]
 
-                        elif role == 'assister':
-                            assister = key
+                participant1, participant2 = (keys + [pd.NA, pd.NA])[:2]
+                participant1_role, participant2_role = (roles + [pd.NA, pd.NA])[:2]
 
                 try:
                     wallclock = pd.to_datetime(play['wallclock'])
@@ -458,8 +454,10 @@ class WNBAScraper():
                     'play_number': play_number, 
                     'play_id': play_id,  
                     'team_id': play['team']['$key'],
-                    'scorer': scorer, 
-                    'assister': assister,
+                    'participant1': participant1, 
+                    'participant2': participant2,
+                    'participant1_role': participant1_role, 
+                    'participant2_role': participant2_role,
                     'text': play['text'], 
                     'type': play_type['slug'], 
                     'type_id': play_type['id'],
@@ -486,8 +484,8 @@ class WNBAScraper():
                     'play_number', 
                     'play_id', 
                     'team_id', 
-                    'scorer', 
-                    'assister', 
+                    'participant1', 
+                    'participant2', 
                     'type_id', 
                     'subtype_id', 
                     'home_score', 
