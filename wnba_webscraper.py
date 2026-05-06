@@ -1,11 +1,27 @@
 import grequests
 import pandas as pd
+import datetime
 from sqlalchemy import create_engine, text
 
 class WNBAScraper():
-    def __init__(self, start_date, end_date):
-        self.start_date = str(start_date)
-        self.end_date = str(end_date)
+    def __init__(self, start_date = None, end_date = None):
+
+        if not start_date and end_date:
+            raise ValueError('If supplying an end date, must also supply a start date.')
+        
+        if not start_date and not end_date:
+            raise ValueError('Must supply a start date, or a start date and end date.')
+        
+        if start_date and not end_date:
+            self.start_date = str(start_date)
+            self.end_date = datetime.date.today().strftime('%Y%m%d')
+        
+        
+        if start_date and end_date:
+            self.start_date = str(start_date)
+            self.end_date = str(end_date)
+
+
         dates = [d for d in pd.date_range(self.start_date, self.end_date).strftime('%Y%m%d').tolist() if d[4:6] in ('05', '06', '07', '08', '09', '10')]
 
         base_headers = {
