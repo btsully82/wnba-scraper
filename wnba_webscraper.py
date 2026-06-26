@@ -5,6 +5,10 @@ import sqlalchemy
 from sqlalchemy import create_engine, text
 
 class WNBAScraper():
+    """
+    This class is a WNBA webscraper. It scrapes ESPN data. 
+    
+    """
     def __init__(self, start_date = None, end_date = None):
         if not start_date and end_date:
             raise ValueError('If supplying an end date, must also supply a start date.')
@@ -458,7 +462,7 @@ class WNBAScraper():
                     'participant2': participant2,
                     'participant1_role': participant1_role, 
                     'participant2_role': participant2_role,
-                    'text': play['text'], 
+                    'text': play.get('text') or pbp[play_id].get('shortDescription') or 'unknown', 
                     'type': play_type['slug'], 
                     'type_id': play_type['id'],
                     'subtype': subtype, 
@@ -516,10 +520,36 @@ class WNBAScraper():
                 conn.execute(text(f'''
                     delete from {table_name}
                     where rowid not in (
-                        select min(rowid)
+                        select max(rowid)
                         from {table_name}
                         group by {unique_keys[table_name]}
                     )
                 '''))
 
         engine.dispose()
+
+
+if __name__ == '__main__':
+    wnba = WNBAScraper(start_date = 20250514, end_date = 20260624)
+    game_data = wnba.game_meta_data()
+    team_df = wnba.team_box_scores()
+    player_df = wnba.player_box_scores()
+    pbp = wnba.pbp()
+
+
+    unique_keys = {
+        'game_data': 'game_id',
+        'team_box_scores': 'team_game_id', 
+        'player_box_scores': 'player_game_id',
+        'pbp': 'play_id'
+    }
+
+
+    tables_dict = {
+        'game_data': game_data,
+        'player_box_scores': player_df, 
+        'team_box_scores': team_df,
+        'pbp': pbp
+    }
+
+    wnba.db_writer('sqlite:///wnba_data.db', unique_keys=unique_keys, tables = tables_dict)
