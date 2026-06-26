@@ -11,3 +11,4 @@ wnba_data.db
 .DS_Store
 com.brendan.wnba_scraper.plist
 logs
+run_scraper.py
